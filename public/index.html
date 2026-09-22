@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedCase - Clinical Portal</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: { 'fade-in': 'fadeIn 0.3s ease-out forwards' },
+                    keyframes: { fadeIn: { '0%': { opacity: 0, transform: 'translateY(5px)' }, '100%': { opacity: 1, transform: 'translateY(0)' } } }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex overflow-hidden selection:bg-teal-200">
+
+    <!-- Auth Overlay -->
+    <div id="authOverlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity overflow-y-auto">
+        <div id="loginScreen" class="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-sm animate-fade-in border border-slate-200 mt-10 mb-10">
+            <div class="bg-teal-700 p-6 text-center shadow-inner border-b-4 border-teal-500">
+                <h2 class="text-2xl font-bold text-white tracking-wide"><i class="fas fa-staff-snake mr-2"></i>MedCase</h2>
+            </div>
+            <div class="p-8 space-y-5">
+                <h3 class="text-lg font-bold text-slate-800 text-center mb-2 border-b-2 border-teal-600 inline-block pb-1 mx-auto block w-fit">Account Login</h3>
+                <div class="space-y-4">
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-teal-600"><i class="fas fa-phone"></i></div>
+                        <input type="tel" id="loginPhone" placeholder="Phone Number" class="w-full pl-10 p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 group-focus-within:text-teal-600"><i class="fas fa-lock"></i></div>
+                        <input type="password" id="loginPassword" placeholder="Password" class="w-full pl-10 p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                </div>
+                <button onclick="window.login()" class="w-full bg-teal-700 text-white p-3 rounded-lg font-bold text-sm shadow hover:bg-teal-800 transition-colors mt-2">Sign In</button>
+                <div class="text-center mt-4">
+                    <p class="text-sm text-slate-500">Don't have an account? <button onclick="window.toggleAuth('register')" class="text-teal-600 font-bold hover:underline">Register Here</button></p>
+                </div>
+            </div>
+        </div>
+
+        <div id="registerScreen" class="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-3xl animate-fade-in border border-slate-200 hidden mt-10 mb-10">
+            <div class="bg-teal-700 p-5 text-center shadow-inner border-b-4 border-teal-500">
+                <h2 class="text-2xl font-bold text-white tracking-wide"><i class="fas fa-staff-snake mr-2"></i>MedCase Registration</h2>
+            </div>
+            <div class="p-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Account Type</label>
+                            <select id="regRole" onchange="window.toggleDoctorFields()" class="w-full p-2.5 text-sm border border-slate-300 bg-slate-50 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none cursor-pointer">
+                                <option value="doctor">Medical Professional</option>
+                                <option value="patient">Patient</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Full Name</label>
+                            <input type="text" id="regName" placeholder="Dr. Jane Doe / John Smith" class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Phone Number (Login ID)</label>
+                            <input type="tel" id="regPhone" placeholder="Mobile Number" class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Create Password</label>
+                            <input type="password" id="regPassword" placeholder="Minimum 6 characters" class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div id="doctorFields" class="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-200 h-full">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Medical Specialization</label>
+                                <select id="regSpecialization" class="w-full p-2.5 text-sm border border-slate-300 bg-white rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                                    <option value="General Practice">General Practice</option><option value="Cardiology">Cardiology</option><option value="Neurology">Neurology</option><option value="Pediatrics">Pediatrics</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-xs font-bold text-slate-600 mb-1">Clinic Name</label><input type="text" id="regClinicName" placeholder="Apollo Center" class="w-full p-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"></div>
+                                <div><label class="block text-xs font-bold text-slate-600 mb-1">City / Region</label><input type="text" id="regCity" placeholder="Mumbai" class="w-full p-2.5 text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"></div>
+                            </div>
+                            <div class="flex items-center justify-between bg-white p-2 border border-slate-200 rounded-lg">
+                                <button onclick="window.getRegistrationLocation(event)" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded font-bold transition-colors shadow-sm"><i class="fas fa-location-crosshairs mr-1"></i> Pin Clinic GPS</button>
+                                <span id="regLocationStatus" class="text-[10px] text-slate-400 italic text-right">For nearby discovery</span>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1">Profile Picture (Optional)</label>
+                                <input type="file" id="regProfilePic" class="w-full p-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer" accept="image/*" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 border-t border-slate-200 pt-4 flex items-center justify-between">
+                    <p class="text-sm text-slate-500">Already registered? <button onclick="window.toggleAuth('login')" class="text-teal-600 font-bold hover:underline">Sign In</button></p>
+                    <button onclick="window.register()" id="registerBtn" class="bg-teal-700 text-white px-8 py-3 rounded-lg font-bold text-sm shadow hover:bg-teal-800 transition-colors">Create Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal with Micro-Slot Generator -->
+    <div id="editProfileModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden border border-slate-200 animate-fade-in">
+            <div class="bg-slate-100 p-4 flex justify-between items-center border-b border-slate-300"><h3 class="text-lg font-bold text-slate-800 flex items-center border-l-4 border-teal-600 pl-2"><i class="fas fa-user-edit text-teal-700 mr-2"></i> Settings</h3><button onclick="window.closeEditProfileModal()" class="text-slate-500 hover:text-red-600 transition-colors text-xl px-2"><i class="fas fa-times"></i></button></div>
+            <div class="p-6 space-y-5">
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Update Phone Number</label><input type="tel" id="editPhone" class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none"></div>
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Update Profile Picture</label><input type="file" id="editProfilePic" class="w-full p-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 cursor-pointer" accept="image/*" /></div>
+                
+                <div id="doctorSlotSettings" class="hidden border-t border-slate-200 pt-4 mt-2">
+                    <label class="block text-xs font-bold text-slate-600 mb-3">Consultation Hours & Intervals</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Start Time</label>
+                            <input type="time" id="editStartTime" class="w-full p-2 text-sm bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">End Time</label>
+                            <input type="time" id="editEndTime" class="w-full p-2 text-sm bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Duration</label>
+                            <select id="editSlotDuration" class="w-full p-2 text-sm bg-slate-50 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 outline-none">
+                                <option value="10">10 mins</option>
+                                <option value="15">15 mins</option>
+                                <option value="20">20 mins</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="window.saveProfileEdits()" id="saveProfileBtn" class="w-full bg-teal-700 text-white p-3 rounded-lg font-bold text-sm shadow hover:bg-teal-800 transition-colors mt-2"><i class="fas fa-save mr-2"></i>Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="w-72 bg-white shadow-lg flex flex-col z-10 border-r border-slate-200 relative">
+        <div class="p-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-teal-800"><i class="fas fa-staff-snake text-teal-600 mr-2"></i>MedCase</h1>
+        </div>
+        
+        <div class="relative p-5 border-b border-slate-100 bg-white cursor-pointer hover:bg-slate-50 transition-colors group select-none" onclick="window.toggleProfileMenu(event)" id="userProfileCard">
+            <div class="flex items-center space-x-3">
+                <img id="sidebarProfilePic" src="https://ui-avatars.com/api/?name=User&background=0D8B93&color=fff" class="w-11 h-11 rounded-full shadow border-2 border-teal-100 object-cover">
+                <div class="flex-1 overflow-hidden">
+                    <p id="sidebarName" class="text-sm font-bold text-slate-800 truncate">-</p>
+                    <p id="sidebarRole" class="text-xs font-medium text-teal-600 mt-0.5 truncate">-</p>
+                </div>
+                <i class="fas fa-chevron-down text-slate-400 text-xs transition-transform transform group-hover:text-teal-600" id="profileDropdownIcon"></i>
+            </div>
+            
+            <div id="profileDropdown" class="hidden absolute top-full left-0 w-full bg-white border border-slate-200 shadow-lg rounded-b-lg z-20 overflow-hidden transform -translate-y-1">
+                <div class="p-4 bg-slate-50 border-b border-slate-100">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contact</p>
+                    <p id="dropdownPhone" class="text-sm font-bold text-slate-700 flex items-center"><i class="fas fa-phone mr-2 text-teal-600 text-xs"></i>-</p>
+                </div>
+                <button onclick="window.openEditProfileModal(event)" class="w-full text-left p-3.5 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-700 font-bold border-b border-slate-100">
+                    <i class="fas fa-cog mr-3 text-slate-400 w-4 text-center"></i> Settings
+                </button>
+                <button onclick="window.logout(event)" class="w-full text-left p-3.5 text-sm text-red-600 hover:bg-red-50 font-bold">
+                    <i class="fas fa-sign-out-alt mr-3 text-red-400 w-4 text-center"></i> Secure Logout
+                </button>
+            </div>
+        </div>
+
+        <nav class="p-4 flex-1 space-y-2">
+            <button onclick="window.switchTab('appointments')" id="tab-appointments" class="w-full flex items-center p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium transition-all text-sm border-transparent hidden">
+                <i class="fas fa-chart-pie mr-3 text-slate-400"></i> Dashboard
+            </button>
+            <button onclick="window.switchTab('doctors')" id="tab-doctors" class="w-full flex items-center p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium transition-all text-sm border-transparent hidden">
+                <i class="fas fa-user-doctor mr-3 text-slate-400"></i> Find Doctors
+            </button>
+            <button onclick="window.switchTab('history')" id="tab-history" class="w-full flex items-center p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium transition-all text-sm border-transparent">
+                <i class="fas fa-folder-open mr-3 text-slate-400"></i> <span id="tab-history-text">Patient Archive</span>
+            </button>
+            <button onclick="window.switchTab('telehealth')" id="tab-telehealth" class="w-full flex items-center p-3 text-slate-600 hover:bg-slate-50 hover:text-slate-800 rounded-lg font-medium transition-all text-sm border-transparent">
+                <i class="fas fa-video mr-3 text-slate-400"></i> Telehealth Portal
+            </button>
+        </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-8 relative bg-slate-50/50 scroll-smooth">
+        <!-- DOCTOR DASHBOARD VIEW -->
+        <div id="view-appointments" class="max-w-7xl mx-auto space-y-6 hidden animate-fade-in">
+            <div class="pb-3 border-b border-slate-200 border-l-4 border-teal-600 pl-3">
+                <h2 class="text-2xl font-bold text-slate-800">Clinic Dashboard</h2>
+                <p class="text-slate-500 text-sm mt-1">Analytics overview and pending schedule.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <div class="lg:col-span-1 flex flex-col gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div><p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Total Scheduled</p><p id="statTotal" class="text-3xl font-black text-slate-800">0</p></div>
+                        <div class="w-12 h-12 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 text-xl"><i class="fas fa-users"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div><p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pending Online</p><p id="statOnline" class="text-3xl font-black text-slate-800">0</p></div>
+                        <div class="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 text-xl"><i class="fas fa-video"></i></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                        <div><p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pending In-Clinic</p><p id="statOffline" class="text-3xl font-black text-slate-800">0</p></div>
+                        <div class="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-xl"><i class="fas fa-hospital-user"></i></div>
+                    </div>
+                </div>
+                <div class="lg:col-span-2 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 class="text-sm font-bold text-slate-700 mb-4 border-b-2 border-teal-600 pb-1 w-fit">Patient Case Trends</h3>
+                    <div class="relative h-64 w-full flex justify-center"><canvas id="trendsChart"></canvas></div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fas fa-clock text-teal-600 mr-2"></i>Today's Timeline</h3>
+                <div id="myAppointmentsList" class="grid grid-cols-1 xl:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- FIND DOCTORS VIEW (Patient Only) -->
+        <div id="view-doctors" class="max-w-7xl mx-auto space-y-6 hidden animate-fade-in">
+            <div id="patientUpcomingSection" class="hidden mb-10 pb-6 border-b border-slate-200">
+                <div class="pb-2 border-l-4 border-amber-500 pl-3 mb-4">
+                    <h2 class="text-xl font-bold text-slate-800">Your Scheduled Appointments</h2>
+                    <p class="text-slate-500 text-xs mt-1">Chat securely with your doctor or join your scheduled video call.</p>
+                </div>
+                <div id="patientAppointmentsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            </div>
+
+            <div class="pb-3 border-b border-slate-200 border-l-4 border-teal-600 pl-3 flex justify-between items-end">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Find Nearby Doctors</h2>
+                    <p class="text-slate-500 text-sm mt-1">Discover verified healthcare specialists ranked by proximity.</p>
+                </div>
+                <button onclick="window.getUserLocation()" class="bg-white border border-teal-600 text-teal-700 px-3.5 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-50 flex items-center shadow-sm"><i class="fas fa-location-crosshairs mr-1.5"></i> Update Location</button>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                <div class="flex items-center space-x-3 flex-1 min-w-[280px]">
+                    <i class="fas fa-filter text-teal-600"></i>
+                    <select id="docSpecializationFilter" onchange="window.loadDoctors()" class="p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none w-full max-w-xs">
+                        <option value="All">All Specialties</option><option value="General Practice">General Practice</option><option value="Cardiology">Cardiology</option><option value="Neurology">Neurology</option><option value="Pediatrics">Pediatrics</option>
+                    </select>
+                </div>
+                <span id="userLocationStatus" class="text-xs text-slate-400 font-medium italic">Location not acquired. Showing default list.</span>
+            </div>
+            <div id="doctorsListGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </div>
+
+        <!-- DYNAMIC ACTIVE CONSULTATION VIEW -->
+        <div id="view-consultation" class="max-w-[1400px] mx-auto space-y-4 hidden animate-fade-in">
+            <div class="flex justify-between items-end pb-3 border-b border-slate-200 border-l-4 border-teal-600 pl-3">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">Active Consultation</h2>
+                    <p class="text-slate-500 text-sm mt-1">Patient: <span id="consultPatientName" class="font-bold text-slate-700"></span> (<span id="consultPatientAge"></span>y) &bull; <i class="fas fa-phone mx-1"></i> <span id="consultPatientPhone"></span></p>
+                </div>
+                <div class="text-right">
+                    <span id="consultAptTypeBadge" class="text-xs font-bold px-3 py-1.5 rounded uppercase tracking-wider"></span>
+                    <p class="text-xs font-mono font-bold text-slate-400 mt-1">ID: <span id="consultIdLabel"></span></p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                
+                <div id="consultVideoCol" class="lg:col-span-5 hidden sticky top-4"></div>
+
+                <div id="consultFormCol" class="lg:col-span-12 space-y-6">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-center mb-3 border-b-2 border-slate-200 pb-1 w-full">
+                            <h3 class="text-sm font-bold text-slate-700">Patient Intake Data</h3>
+                            <a id="consultPastHistoryBtn" target="_blank" class="hidden text-xs font-bold bg-teal-50 text-teal-700 px-3 py-1 rounded border border-teal-200 hover:bg-teal-100 transition-colors"><i class="fas fa-file-medical mr-1.5"></i>View Attached Report</a>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Reported Symptoms</p>
+                                <p id="consultSymptoms" class="text-sm text-slate-700 bg-slate-50 p-3 rounded border border-slate-100 italic min-h-[60px]"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Past Medical History</p>
+                                <p id="consultPastHistoryText" class="text-sm text-slate-700 bg-slate-50 p-3 rounded border border-slate-100 italic min-h-[60px]"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="text-sm font-bold text-slate-700 mb-4 border-b-2 border-teal-600 pb-1 w-fit">Patient Vitals</h3>
+                        <div class="grid grid-cols-3 sm:grid-cols-7 gap-3">
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">HR (bpm)</label><input type="number" id="vitalHR" class="w-full p-2 text-sm border border-slate-300 rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">BP (mmHg)</label><input type="text" id="vitalBP" class="w-full p-2 text-sm border border-slate-300 rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">SpO2 (%)</label><input type="number" id="vitalSpO2" class="w-full p-2 text-sm border border-slate-300 rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Temp (F)</label><input type="text" id="vitalTemp" class="w-full p-2 text-sm border border-slate-300 rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Sugar</label><input type="number" id="vitalSugar" class="w-full p-2 text-sm border border-slate-300 rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-teal-600 uppercase mb-1">Weight (kg)*</label><input type="number" id="vitalWeight" class="w-full p-2 text-sm border border-teal-300 bg-white rounded shadow-inner outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-teal-600 uppercase mb-1">Height (cm)*</label><input type="number" id="vitalHeight" class="w-full p-2 text-sm border border-teal-300 bg-white rounded shadow-inner outline-none focus:border-teal-500"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-teal-700">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="flex flex-col space-y-3">
+                                <div>
+                                    <label class="block text-sm font-bold text-slate-700 mb-2 border-b-2 border-teal-600 pb-1 w-fit">Prescribed Medications & Plan</label>
+                                    <textarea id="consultMedications" rows="6" class="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500 resize-none shadow-inner" placeholder="Enter treatment plan..."></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-slate-600 mb-1">Attach Final Report / Scan (Optional)</label>
+                                    <input type="file" id="consultDocumentUpload" class="w-full p-2 text-sm text-slate-600 bg-slate-50 border border-slate-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-teal-100 file:text-teal-800 cursor-pointer" accept="image/*,.pdf" />
+                                </div>
+                            </div>
+                            <div class="flex flex-col">
+                                <div class="flex justify-between items-center mb-2 border-b-2 border-teal-600 pb-1 w-full">
+                                    <label class="block text-sm font-bold text-slate-700">Clinical Assessment</label>
+                                    <button onclick="window.generateDiagnosis()" id="analyzeBtn" class="text-[10px] bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 px-3 py-1 rounded font-bold transition-colors flex items-center shadow-sm"><i class="fas fa-magic mr-1.5"></i> Ask AI Assistant</button>
+                                </div>
+                                <textarea id="aiOutput" rows="7" class="w-full p-3 text-sm bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500 resize-none shadow-inner flex-1" placeholder="Generate AI diagnosis or manually type assessment here..."></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-5 border-t border-slate-200 pt-5 flex justify-end space-x-3">
+                            <button onclick="window.switchTab('appointments')" class="px-6 py-2.5 rounded-lg font-bold text-sm text-slate-500 hover:bg-slate-100 border border-slate-300 transition-colors">Cancel</button>
+                            <button onclick="window.saveConsultation()" id="saveConsultBtn" class="bg-teal-700 hover:bg-teal-800 text-white px-8 py-2.5 rounded-lg font-bold text-sm shadow transition-colors flex items-center"><i class="fas fa-check-circle mr-2"></i> Save & Complete Consult</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="view-history" class="max-w-7xl mx-auto space-y-6 hidden animate-fade-in">
+            <h2 id="history-view-title" class="text-2xl font-bold text-slate-800 border-b border-slate-200 pb-2 border-l-4 border-teal-600 pl-3">Patient Archive</h2>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 text-sm border-b border-slate-200 font-bold">
+                            <th class="p-4 w-1/5 border-b-2 border-teal-600">Encounter ID / Date</th>
+                            <th class="p-4 w-1/4 border-b-2 border-teal-600">Contact Details</th>
+                            <th class="p-4 border-b-2 border-teal-600">Clinical Overview</th>
+                            <th class="p-4 text-right border-b-2 border-teal-600">Records</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable" class="text-sm"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- RESTORED TELEHEALTH VIEW WITH PAST CASES -->
+        <div id="view-telehealth" class="max-w-7xl mx-auto space-y-6 hidden animate-fade-in">
+            <div class="pb-3 border-b border-slate-200 border-l-4 border-teal-600 pl-3">
+                <h2 class="text-2xl font-bold text-slate-800">Telehealth Portal</h2>
+                <p class="text-slate-500 text-sm mt-1">Access scheduled online consultations, reconnect to past cases, or join ad-hoc rooms.</p>
+            </div>
+            
+            <div id="telehealthSetup" class="space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-3xl mx-auto">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fas fa-video text-teal-600 mr-2"></i>Pending Online Consultations</h3>
+                    <div id="telehealthConsultationList" class="space-y-3 max-h-[400px] overflow-y-auto pr-2"></div>
+                </div>
+
+                <div id="thHistoryBox" class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 max-w-3xl mx-auto hidden">
+                    <h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fas fa-history text-teal-600 mr-2"></i>Past Consultations (Reconnect)</h3>
+                    <div id="telehealthHistoryList" class="space-y-3 max-h-[400px] overflow-y-auto pr-2"></div>
+                </div>
+
+                <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 max-w-md mx-auto text-center shadow-sm">
+                    <p class="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">Or Enter Secure ID Manually</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="manualTelehealthRoomId" class="flex-1 p-3 text-sm bg-white border border-slate-300 rounded-lg text-center font-bold font-mono tracking-widest outline-none focus:border-teal-500">
+                        <button onclick="window.joinManualTelehealth()" class="bg-teal-700 text-white px-5 py-3 rounded-lg font-bold text-sm hover:bg-teal-800 shadow">Connect</button>
+                    </div>
+                </div>
+            </div>
+            <div id="standaloneVideoAnchor"></div>
+        </div>
+    </main>
+
+    <!-- FLOATING VIDEO CALL WRAPPER -->
+    <div id="videoWrapper" class="hidden flex flex-col w-full h-full min-h-[500px] animate-fade-in">
+        <div class="bg-slate-900 p-3 rounded-t-xl border-t border-l border-r border-slate-800 flex justify-between items-center z-10">
+            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center"><i class="fas fa-lock mr-1.5 text-teal-500"></i> E2E Encrypted Feed</span>
+            <span id="activeRoomIdDisplay" class="font-bold text-teal-400 font-mono tracking-widest text-xs"></span>
+        </div>
+        <div class="relative w-full flex-1 bg-black rounded-b-xl shadow-2xl overflow-hidden border-b border-l border-r border-slate-800 flex">
+            <video id="remoteVideo" class="w-full h-full object-cover" autoplay playsinline></video>
+            <div class="absolute top-4 left-4 w-32 h-24 bg-slate-800 rounded-lg overflow-hidden border-2 border-slate-700 shadow-2xl z-20">
+                <video id="localVideo" class="w-full h-full object-cover transform scale-x-[-1]" autoplay playsinline muted></video>
+            </div>
+
+            <div id="chatPanel" class="hidden absolute top-4 right-4 bottom-20 w-64 bg-white/95 backdrop-blur-md rounded-xl shadow-2xl flex flex-col z-30 border border-slate-200 overflow-hidden transition-all">
+                <div class="bg-teal-700 p-2 text-white font-bold flex justify-between items-center text-xs shadow-inner">
+                    <span><i class="fas fa-comments mr-1"></i>Live Chat</span>
+                    <button onclick="window.toggleChat()" class="text-white/70 hover:text-white"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="chatMessages" class="flex-1 p-3 overflow-y-auto space-y-2 text-xs flex flex-col"><div class="text-center text-[9px] text-slate-400 italic mb-1">P2P Private Chat</div></div>
+                <div class="p-2 bg-slate-50 border-t border-slate-200 flex space-x-2">
+                    <input type="text" id="chatInput" placeholder="Message..." class="flex-1 p-1.5 text-xs bg-white border border-slate-300 rounded focus:outline-none focus:ring-1 focus:ring-teal-500" onkeypress="if(event.key === 'Enter') window.sendChatMessage()">
+                    <button onclick="window.sendChatMessage()" class="bg-teal-600 text-white px-2 rounded hover:bg-teal-700 transition-colors"><i class="fas fa-paper-plane text-xs"></i></button>
+                </div>
+            </div>
+
+            <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800/80 backdrop-blur-md px-4 py-2 rounded-full flex space-x-3 border border-slate-600 shadow-2xl z-30">
+                <button id="btnMic" onclick="window.toggleMic()" class="w-10 h-10 bg-slate-600 hover:bg-slate-500 text-white rounded-full flex items-center justify-center transition-colors shadow text-sm"><i class="fas fa-microphone"></i></button>
+                <button id="btnCam" onclick="window.toggleVideo()" class="w-10 h-10 bg-slate-600 hover:bg-slate-500 text-white rounded-full flex items-center justify-center transition-colors shadow text-sm"><i class="fas fa-video"></i></button>
+                <button onclick="window.toggleChat()" class="w-10 h-10 bg-teal-600 hover:bg-teal-500 text-white rounded-full flex items-center justify-center transition-colors shadow text-sm"><i class="fas fa-comment-dots"></i></button>
+                <div class="w-px h-6 bg-slate-600 my-auto mx-1"></div>
+                <button onclick="window.endTelehealth()" class="w-10 h-10 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center transition-colors shadow-lg text-sm"><i class="fas fa-phone-slash"></i></button>
+            </div>
+            <div id="videoWaitingText" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-sm z-10 transition-opacity duration-300">
+                <i class="fas fa-circle-notch fa-spin text-teal-500 text-4xl mb-3"></i>
+                <p class="text-white font-bold tracking-wide text-sm" id="videoStatusText">Accessing cameras...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADVANCED COMPREHENSIVE BOOKING MODAL -->
+    <div id="bookingModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-opacity overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden border border-slate-200 animate-fade-in my-8">
+            <div class="bg-teal-700 p-5 text-white flex justify-between items-center">
+                <div><h3 class="font-bold text-lg"><i class="fas fa-calendar-check mr-2"></i>Schedule Consultation</h3><p id="bookingDoctorTitle" class="text-sm text-teal-100 mt-0.5"></p></div>
+                <button onclick="window.closeBookingModal()" class="text-teal-200 hover:text-white text-2xl"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Date</label><input type="date" id="bookDate" class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500" /></div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Time Slot</label>
+                            <select id="bookTimeSlot" class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500">
+                                <!-- Filled by JS dynamically based on Doctor slots -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1">Mode</label>
+                            <select id="bookType" class="w-full p-2.5 text-sm font-bold text-teal-800 bg-teal-50 border border-teal-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500">
+                                <option value="Offline">Offline (In-Clinic)</option><option value="Online">Online (Video Call)</option>
+                            </select>
+                        </div>
+                        <div><label class="block text-xs font-bold text-teal-700 mb-1">Patient Age *</label><input type="number" id="bookAge" class="w-full p-2.5 text-sm bg-slate-50 border border-teal-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500" /></div>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <h4 class="text-xs font-bold text-teal-700 mb-3 uppercase tracking-wider">Patient Vitals</h4>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <div><label class="block text-[10px] font-bold text-teal-600 mb-1">Height (cm) *</label><input type="number" id="bookHeight" class="w-full p-2 text-sm border border-teal-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-teal-600 mb-1">Weight (kg) *</label><input type="number" id="bookWeight" class="w-full p-2 text-sm border border-teal-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">HR (bpm)</label><input type="number" id="bookHR" class="w-full p-2 text-sm border border-slate-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">BP (mmHg)</label><input type="text" id="bookBP" class="w-full p-2 text-sm border border-slate-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Temp (F)</label><input type="text" id="bookTemp" class="w-full p-2 text-sm border border-slate-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">SpO2 (%)</label><input type="number" id="bookSpO2" class="w-full p-2 text-sm border border-slate-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 mb-1">Blood Sugar</label><input type="number" id="bookSugar" class="w-full p-2 text-sm border border-slate-300 rounded bg-white shadow-inner focus:outline-none focus:border-teal-500"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col h-full">
+                    <div class="flex justify-between items-end mb-1">
+                        <label class="block text-xs font-bold text-teal-700">Chief Symptoms *</label>
+                        <button id="bookMicBtnSymptoms" onclick="window.toggleRecording('bookMicBtnSymptoms', 'bookSymptoms')" class="flex items-center justify-center w-7 h-7 bg-slate-100 text-slate-600 rounded-full hover:bg-teal-600 hover:text-white transition-all border border-slate-200" title="Dictate Symptoms"><i class="fas fa-microphone text-[10px]"></i></button>
+                    </div>
+                    <textarea id="bookSymptoms" class="w-full flex-1 p-3 text-sm bg-slate-50 border border-teal-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500 resize-none min-h-[120px]" placeholder="Type or use microphone to dictate symptoms here to save time during consultation..."></textarea>
+                    
+                    <div class="flex justify-between items-end mb-1 mt-4">
+                        <label class="block text-xs font-bold text-slate-600">Past Medical History (Optional)</label>
+                        <button id="bookMicBtnHistory" onclick="window.toggleRecording('bookMicBtnHistory', 'bookPastHistory')" class="flex items-center justify-center w-7 h-7 bg-slate-100 text-slate-600 rounded-full hover:bg-teal-600 hover:text-white transition-all border border-slate-200" title="Dictate History"><i class="fas fa-microphone text-[10px]"></i></button>
+                    </div>
+                    <textarea id="bookPastHistory" class="w-full flex-1 p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-teal-500 resize-none min-h-[80px]" placeholder="List previous surgeries, chronic conditions, etc..."></textarea>
+
+                    <div class="mt-4">
+                        <label class="block text-xs font-bold text-slate-600 mb-1">Attach Previous Report (Optional)</label>
+                        <input type="file" id="bookPastHistoryUpload" class="w-full p-2 text-sm text-slate-600 bg-slate-50 border border-slate-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-teal-100 file:text-teal-800 cursor-pointer" accept="image/*,.pdf" />
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 bg-slate-50 border-t border-slate-200">
+                <button onclick="window.confirmBooking()" id="confirmBookingBtn" class="w-full bg-teal-700 hover:bg-teal-800 text-white font-bold p-3.5 rounded-lg text-sm shadow transition-colors flex justify-center items-center"><i class="fas fa-calendar-check mr-2"></i> Book & Generate Secure ID</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PERSISTENT CLINICAL MESSENGER SLIDE-OVER -->
+    <div id="persistentChatWrapper" class="fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-200">
+        <div class="bg-teal-700 p-4 text-white flex justify-between items-center shadow-md">
+            <div><h3 class="font-bold text-lg flex items-center"><i class="fas fa-comment-medical mr-2"></i> Clinical Messenger</h3><p id="chatTargetName" class="text-xs text-teal-100 font-medium tracking-wide"></p></div>
+            <button onclick="window.closePersistentChat()" class="text-teal-100 hover:text-white text-xl px-2 transition-colors"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="persistentChatMessages" class="flex-1 p-5 overflow-y-auto space-y-4 bg-slate-50 flex flex-col"><div class="text-center text-xs text-slate-400 italic my-auto">End-to-end encrypted messaging via verified phone identifiers.</div></div>
+        <div class="p-3 bg-white border-t border-slate-200 space-y-2 shadow-inner">
+            <div id="chatMediaPreview" class="hidden flex items-center justify-between bg-slate-100 p-2 rounded text-xs text-slate-600 font-medium border border-slate-200"><span id="chatMediaName" class="truncate">Attached file</span><button onclick="window.clearChatMedia()" class="text-red-500 hover:text-red-700 ml-2"><i class="fas fa-times"></i></button></div>
+            <div class="flex items-end space-x-2">
+                <label class="cursor-pointer text-slate-400 hover:text-teal-600 p-2 transition-colors"><i class="fas fa-paperclip text-lg"></i><input type="file" id="chatMediaInput" class="hidden" onchange="window.previewChatMedia()" accept="image/*,.pdf" /></label>
+                <textarea id="persistentChatInput" rows="1" class="flex-1 p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none max-h-24 overflow-y-auto" placeholder="Type a clinical note..." onkeypress="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); window.sendPersistentMessage(); }"></textarea>
+                <button id="chatMicBtn" onclick="window.toggleChatAudioRecording()" class="text-slate-400 hover:text-teal-600 p-2 transition-colors"><i class="fas fa-microphone text-lg"></i></button>
+                <button id="chatSendBtn" onclick="window.sendPersistentMessage()" class="bg-teal-700 text-white p-2.5 rounded-lg hover:bg-teal-800 transition-colors shadow-sm"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </div>
+    <div id="chatOverlay" onclick="window.closePersistentChat()" class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40 hidden transition-opacity"></div>
+
+    <!-- Case Record Edit Modal (Printable) -->
+    <div id="patientModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+            <div class="bg-slate-100 p-4 flex justify-between items-center border-b border-slate-300">
+                <div class="flex items-center space-x-3">
+                    <h3 class="text-lg font-bold text-slate-800 border-l-4 border-teal-600 pl-2">Case Record</h3><span id="modalConsultIdBadge" class="text-xs font-bold font-mono bg-teal-100 text-teal-800 px-2.5 py-1 rounded border border-teal-200"></span>
+                </div>
+                <div class="flex space-x-2">
+                    <button id="modalSaveEditsBtn" onclick="window.saveArchiveEdits()" class="hidden bg-teal-600 hover:bg-teal-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow-sm transition-colors"><i class="fas fa-save mr-1.5"></i> Save Edits</button>
+                    <button onclick="window.downloadPDF()" class="bg-white border border-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-bold flex items-center hover:bg-slate-50"><i class="fas fa-print mr-1.5 text-teal-700"></i> PDF</button>
+                    <button onclick="window.closeModal()" class="text-slate-500 hover:text-red-600 text-xl px-2 ml-1"><i class="fas fa-times"></i></button>
+                </div>
+            </div>
+            
+            <div id="printableReport" class="flex-1 overflow-y-auto bg-white p-8 space-y-6">
+                <div class="border-b border-slate-200 pb-4 flex justify-between text-sm text-slate-800"><div id="modalDoctorContact"></div><div id="modalPatientContact" class="text-right"></div></div>
+                <div id="modalVitals"></div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="flex flex-col">
+                        <h4 class="text-sm font-bold text-slate-800 mb-2 border-b-2 border-teal-600 pb-1 w-fit">Reported Symptoms</h4>
+                        <div id="modalSymptoms" class="w-full text-sm text-slate-700 p-3 border rounded bg-slate-50 flex-1 min-h-[100px] whitespace-pre-wrap break-words outline-none focus:ring-2 focus:ring-teal-500 cursor-text"></div>
+                    </div>
+                    <div class="flex flex-col">
+                        <h4 class="text-sm font-bold text-slate-800 mb-2 border-b-2 border-teal-600 pb-1 w-fit">Prescribed Plan</h4>
+                        <div id="modalMedications" class="w-full text-sm text-slate-700 p-3 border rounded bg-slate-50 flex-1 min-h-[100px] whitespace-pre-wrap break-words outline-none focus:ring-2 focus:ring-teal-500 cursor-text"></div>
+                    </div>
+                </div>
+                <div class="flex flex-col">
+                    <h4 class="text-sm font-bold text-teal-800 mb-2 border-b-2 border-teal-600 pb-1 w-fit">Clinical Diagnosis</h4>
+                    <div id="modalDiagnosis" class="w-full text-sm text-slate-800 p-4 border rounded bg-slate-50 min-h-[150px] whitespace-pre-wrap break-words outline-none focus:ring-2 focus:ring-teal-500 cursor-text"></div>
+                </div>
+                
+                <div id="editDocumentWrapper" class="hidden mt-4 pt-4 border-t border-slate-200">
+                    <label class="block text-xs font-bold text-slate-600 mb-1">Add/Update Final Report / Scan</label>
+                    <input type="file" id="editDocumentUpload" class="w-full p-2 text-sm text-slate-600 bg-white border border-slate-300 rounded-lg file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-teal-100 file:text-teal-800 cursor-pointer" accept="image/*,.pdf" />
+                </div>
+            </div>
+            <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center"><h4 class="text-sm font-bold text-slate-700 border-l-4 border-teal-600 pl-2">Attached Reports</h4><div id="modalDocuments"></div></div>
+        </div>
+    </div>
+
+    <script src="app.js?v=29000"></script>
+</body>
+</html>
