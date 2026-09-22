@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +20,5 @@
     "html2pdf": "^0.0.11",
     "mongoose": "^9.9.3"
   }
-  "scripts": {
-  "build": "node server.js"
-}
+
 }
